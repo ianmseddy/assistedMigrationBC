@@ -8,14 +8,14 @@ defineModule(sim, list(
   name = "assistedMigrationBC",
   description = "",
   keywords = "",
-  authors = structure(list(list(given = c("First", "Middle"), family = "Last", role = c("aut", "cre"), email = "email@example.com", comment = NULL)), class = "person"),
+  authors = structure(list(list(given = c("Ian"), family = "Eddy", role = c("aut", "cre"), email = "ian.eddy@canada.com", comment = NULL)), class = "person"),
   childModules = character(0),
   version = list(SpaDES.core = "1.0.0.9000", assistedMigrationBC = "0.0.0.9000"),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.txt", "assistedMigrationBC.Rmd")),
-  reqdPkgs = list(),
+  reqdPkgs = list('data.table', 'magrittr', 'raster'),
   parameters = rbind(
     #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
@@ -29,11 +29,23 @@ defineModule(sim, list(
     defineParameter(".useCache", "logical", FALSE, NA, NA,
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
-                          "and time are not relevant"))
+                          "and time are not relevant")),
+    defineParameter("sppEquivCol", "character", "Boreal", NA, NA,
+                    "The column in sim$specieEquivalency data.table to use as a naming convention")
   ),
   inputObjects = bind_rows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
-    expectsInput(objectName = NA, objectClass = NA, desc = NA, sourceURL = NA)
+    expectsInput("cohortData", "data.table",
+                 desc = "Columns: B, pixelGroup, speciesCode, Indicating several features about ages and current vegetation of stand"),
+    expectsInput("sppEquiv", "data.table",
+                 desc = "table of species equivalencies. See LandR::sppEquivalencies_CA.",
+                 sourceURL = ""),
+    expectsInput("transferTable", 'data.table',
+                 desc = "table of transfer functions representing climate-sensitive genetic growth - from Greg O'Neil",
+                 sourceURL = 'https://drive.google.com/open?id=1N0VrvdgtzQLzlVhMYAg-xKPVLcxOZTSe'),
+    expectsInput(objectName = "projectedBEC", "rasterStack",
+                 desc = "the projected BEC zones; already reclassified to ensure consistent raster representation",
+                 sourceURL = 'https://drive.google.com/open?id=1DDo6Wnok1tGbn1YvMBzw6EFi0XHnYMeT')
   ),
   outputObjects = bind_rows(
     #createsOutput("objectName", "objectClass", "output object description", ...),
@@ -123,9 +135,9 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
 
 ### template initialization
 Init <- function(sim) {
-  # # ! ----- EDIT BELOW ----- ! #
-
-  # ! ----- STOP EDITING ----- ! #
+  browser()
+  sim$provenanceTable <- generateBCProvenanceTable(transferTable = NULL, ecoregionCol, ecoregionKey,
+                                      method = 'default', sppEquiv, sppEquivCol)
 
   return(invisible(sim))
 }
@@ -173,26 +185,32 @@ Event2 <- function(sim) {
 }
 
 .inputObjects <- function(sim) {
-  # Any code written here will be run during the simInit for the purpose of creating
-  # any objects required by this module and identified in the inputObjects element of defineModule.
-  # This is useful if there is something required before simulation to produce the module
-  # object dependencies, including such things as downloading default datasets, e.g.,
-  # downloadData("LCC2005", modulePath(sim)).
-  # Nothing should be created here that does not create a named object in inputObjects.
-  # Any other initiation procedures should be put in "init" eventType of the doEvent function.
-  # Note: the module developer can check if an object is 'suppliedElsewhere' to
-  # selectively skip unnecessary steps because the user has provided those inputObjects in the
-  # simInit call, or another module will supply or has supplied it. e.g.,
-  # if (!suppliedElsewhere('defaultColor', sim)) {
-  #   sim$map <- Cache(prepInputs, extractURL('map')) # download, extract, load file from url in sourceURL
-  # }
 
-  #cacheTags <- c(currentModule(sim), "function:.inputObjects") ## uncomment this if Cache is being used
+  cacheTags <- c(currentModule(sim), "function:.inputObjects") ## uncomment this if Cache is being used
   dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
   message(currentModule(sim), ": using dataPath '", dPath, "'.")
 
   # ! ----- EDIT BELOW ----- ! #
+  if (!suppliedElsewhere("transferTable", sim)) {
+    sim$transferTable <- prepInputs(url = extractURL('transferTable', sim), destinationPath = dPath,
+                                    targetFile = "GregONeilData_Formatted.csv", fun = 'fread')
+  }
 
+  # if (!suppliedElsehwere("cohortData", sim)) {
+  #   stop("This module needs cohortData. Please run one of Biomass_core or Biomass_borealDataPrep or contact authors")
+  # }
+
+  if (!suppliedElsewhere("projectedBEC", sim)) {
+
+    sim$projectedBEC <- prepInputs(targetFile = "projectedBECzones.grd",
+                             url = extractURL("projectedBEC", sim),
+                             destinationPath = dPath, fun = "raster::stack",
+                             alsoExtract = "projectedBECzones.gri",
+                             studyArea = sim$studyArea,
+                             rasterToMatch = sim$rasterToMatch,
+                             useCache = TRUE,
+                             cacheTags = c(cacheTags, 'flyingBECs')) #assume we only need these for studyArea!
+  }
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }

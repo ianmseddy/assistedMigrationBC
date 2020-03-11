@@ -1,0 +1,6 @@
+"file" "checksum" "filesize" "algorithm"
+"GregONeilData_Formatted.csv" "bbb514e708f42ad7" "41111702" "xxhash64"
+"reclassifiedBecZones.zip" "f946034f64bc44bd" "2177135" "xxhash64"
+"projectedBECzones.zip" "61399a2ba9a12223" "2309749" "xxhash64"
+"projectedBECzones.grd" "29a42c8afb4a6c46" "496" "xxhash64"
+"projectedBECzones.gri" "40e0b09bf22de0f1" "67366448" "xxhash64"

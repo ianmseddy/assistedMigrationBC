@@ -4,6 +4,7 @@
 #' BECvarfut_plantation, BECvar_seed, and HTp_pred. If not provided, this will return a table where
 #' every species is planted wherever possible, according to ecoregionDT
 #' @param ecoregionCol the column name in ecoregion to match with transferTable - this matching is hardcoded
+#' @param futureBEC the projected BEC zones. The zones MUST correspond to ecoregionKey and cohortData
 #' @param ecoregionKey a table for mapping ecoregion codes to the BEC zone/subzone/variant
 #' column used by transferTable
 #' @param sppEquiv the LandR sppEquivalency table for matchign species names
@@ -11,9 +12,10 @@
 #' @param method experimental - this will change how particular species are prioritized for planting
 #' @return a provenance table object to be used with LandR_reforestation
 #' @export
-generateBCProvenanceTable <- function(transferTable = NULL, ecoregionCol, ecoregionKey,
+generateBCProvenanceTable <- function(transferTable = NULL, ecoregionCol, ecoregionKey, futureBEC,
                                       method = 'default', sppEquiv, sppEquivCol) {
 
+  browser()
   transferTable <- copy(transferTable)
   if (!is.null(transferTable)) {
     #due to the factorization of the zsv column in BEC zone data,
