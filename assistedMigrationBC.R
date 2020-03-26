@@ -76,6 +76,8 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "assistedMigrationBC", "plot")
       sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "assistedMigrationBC", "save")
+      sim <- scheduleEvent(sim, 2020, 'assistedMigrationBC', 'updateProvenanceTable')
+
     },
     plot = {
       # ! ----- EDIT BELOW ----- ! #
@@ -103,19 +105,21 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
 
       # ! ----- STOP EDITING ----- ! #
     },
-    event1 = {
+    updateProvenanceTable = {
       # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
+      projectedBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
 
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
+      sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
+                                                       BECkey = sim$BECkey,
+                                                       projectedBEC = projectedBEC,
+                                                       ecoregionMap = sim$ecoregionMap,
+                                                       sppEquiv = sim$sppEquiv,
+                                                       sppEquivCol = P(sim)$sppEquivCol)
+      if (time(sim) < 2080) {
+        #The bECs update every 30 years REF - 2020, 2050, 2080
+        sim  <- scheduleEvent(sim, time(sim) + 30, "assistedMigrationBC", updateProvenanceTable)
+      }
 
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + increment, "assistedMigrationBC", "templateEvent")
-
-      # ! ----- STOP EDITING ----- ! #
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
@@ -128,15 +132,13 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
 
 ### template initialization
 Init <- function(sim) {
-  browser()
 
   sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
                                                    BECkey = sim$BECkey,
                                                    projectedBEC = sim$projectedBEC$BECref,
                                                    ecoregionMap = sim$ecoregionMap,
                                                    sppEquiv = sim$sppEquiv,
-                                                   sppEquivCol = P(sim)$sppEquivCol,
-                                                   method = 'default')
+                                                   sppEquivCol = P(sim)$sppEquivCol)
 
   return(invisible(sim))
 }
@@ -160,18 +162,6 @@ plotFun <- function(sim) {
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
-
-### template for your event1
-Event1 <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # THE NEXT TWO LINES ARE FOR DUMMY UNIT TESTS; CHANGE OR DELETE THEM.
-  # sim$event1Test1 <- " this is test for event 1. " # for dummy unit test
-  # sim$event1Test2 <- 999 # for dummy unit test
-
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
-
 
 .inputObjects <- function(sim) {
 
