@@ -35,15 +35,30 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
   ecoregionTable <- as.data.table(ecoregionMap@data@attributes[[1]])
   currentAndFutureBECs <- currentAndFutureBECs[ecoregionMap@data@attributes[[1]], on = c('ecoID' = 'ID')]
 
+  #Join BECkey with transferTable to get the ecoregionID representation of BEC zones
+  #Fix differences
+  transferTable <- BECkey[transferTable, on = c('zsv' = 'BECvarfut_plantation')]
+  #reduce TransferTable - for sanity
+  transferTable <- transferTable[ID %in% currentAndFutureBECs$projEcoregion]
+
+  #Current and future BECs must be reduced from pixel index. It will be too much computational strain to find optimal provenance at pixel level
+  # When scaling up, there may be multiple projected ecozones per ecozone - take mode
+  currentAndFutureBECs <- currentAndFutureBECs[, .N, .(ecoID, projEcoregion, ecoregion, ecoregionGroup)] %>%
+    .[, mode := max(N), .(ecoID)] %>%
+    .[N == mode, .SD, .SDcols = c("ecoregionGroup", 'projEcoregion')]
+
+  #currentAndFutureBECs can now be joined with transferTable to find the optimal provenance per ecoregion
+  transferTable <- transferTable[currentAndFutureBECs, on  = c("ID" = 'projEcoregion')]
+
+  # Noww projEcoregion = what it will become, and ecoregion = the original ecoregion
   if (method == "default") {
-   transferTable
+
     #subset each ecoregionGroup/species by the minimum height reduction (ie max when expressed as proportion) among provenances
-    optimalProvenance <- transferTable[, score := rank(HTp_pred, ties.method = 'random'), by = .(BECvarfut_plantation, speciesCode)]# %>%
+    optimalProvenance <- transferTable[, score := rank(HTp_pred, ties.method = 'random'), by = .(ecoregionGroup, speciesCode)]# %>%
     .[, best := max(score), .(BECvarfut_plantation, speciesCode)] %>%
       .[score == best,]
 
-    optimalProvenance <- optimalProvenance[ecoregionKey, on = c('BECvarfut_plantation' = 'newCol'), allow.cartesian = TRUE]
-    setnames(optimalProvenance, old = "BECvar_seed", "Provenance")
+    setnames(optimalProvenance, old = 'BECvar_seed', new = "Provenance")
 
     provenanceTable <- optimalProvenance[, .(ecoregionGroup, Provenance, speciesCode)]
 
