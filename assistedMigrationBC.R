@@ -199,7 +199,7 @@ plotFun <- function(sim) {
                              rasterToMatch = sim$rasterToMatch,
                              useCache = TRUE,
                              overwrite = TRUE,
-                             cacheTags = c(cacheTags, 'flyingBECs')) #assume we only need these for studyArea!
+                             userTags = c(cacheTags, 'flyingBECs')) #assume we only need these for studyArea!
   }
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))

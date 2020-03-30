@@ -70,7 +70,7 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
 
   #currentAndFutureBECs can now be joined with transferTable to find the optimal provenance per ecoregion
   #each projected Ecoregion may have multiple species, while each ecoregion has many ecoregionGroups, hence cartesian
-  provenanceTable1 <- provenanceTable[currentAndFutureBECs, on  = c("ID" = 'projEcoregion'), allow.cartesian = TRUE] %>%
+  provenanceTable <- provenanceTable[currentAndFutureBECs, on  = c("ID" = 'projEcoregion'), allow.cartesian = TRUE] %>%
     .[, .SD, .SDcols = c("ecoregionGroup", 'speciesCode', 'Provenance')]
 
   provenanceTable[, ecoregionGroup := as.factor(ecoregionGroup)]
