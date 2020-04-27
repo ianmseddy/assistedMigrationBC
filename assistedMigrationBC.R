@@ -176,14 +176,12 @@ plotFun <- function(sim) {
                              fun = 'data.table::fread', useCache = TRUE,
                              overwrite = TRUE,
                              userTags = c(cacheTags, 'BECkey'))
-    sim$BECkey[, V1 := NULL]
   }
 
 
   if (!suppliedElsewhere("transferTable", sim)) {
     sim$transferTable <- prepInputs(url = extractURL('transferTable', sim), destinationPath = dPath,
                                     targetFile = "GregONeilData_Formatted.csv", fun = 'fread')
-    sim$transferTable[, V1 := NULL] #this column created by fread
   }
 
   # if (!suppliedElsehwere("cohortData", sim)) {
@@ -192,14 +190,17 @@ plotFun <- function(sim) {
 
   if (!suppliedElsewhere("projectedBEC", sim)) {
 
-    sim$projectedBEC <- prepInputs(targetFile = "reclassifiedBECs.rds",
-                             url = extractURL("projectedBEC", sim),
-                             destinationPath = dPath, fun = "readRDS",
-                             studyArea = sim$studyArea,
-                             rasterToMatch = sim$rasterToMatch,
-                             useCache = TRUE,
-                             overwrite = TRUE,
-                             userTags = c(cacheTags, 'flyingBECs')) #assume we only need these for studyArea!
+    sim$projectedBEC <- prepInputs(targetFile = 'reclassifiedBECs.grd',
+                                   url = extractURL("projectedBEC", sim),
+                                   destinationPath = dPath,
+                                   fun = "raster::stack",
+                                   alsoExtract = 'reclassifiedBECs.gri',
+                                   studyArea = sim$studyArea,
+                                   rasterToMatch = sim$rasterToMatch,
+                                   purge = 7,
+                                   useCache = TRUE,
+                                   overwrite = TRUE,
+                                   userTags = c(cacheTags, 'flyingBECs')) #assume we only need these for studyArea!
   }
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
