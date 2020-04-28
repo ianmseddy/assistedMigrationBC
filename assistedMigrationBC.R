@@ -39,6 +39,7 @@ defineModule(sim, list(
                  sourceURL = "https://drive.google.com/open?id=1v4_ZSXFAopYrTPpapxB3cHAIJJLE0sX0"),
     expectsInput("cohortData", "data.table",
                  desc = "Columns: B, pixelGroup, speciesCode, Indicating several features about ages and current vegetation of stand"),
+    expectsInput("currentBEC", 'RasterLayer', desc = "the projected BEC zones at time(sim)"),
     expectsInput("sppEquiv", "data.table",
                  desc = "table of species equivalencies. See LandR::sppEquivalencies_CA.",
                  sourceURL = ""),
@@ -87,11 +88,11 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
     },
     updateProvenanceTable = {
       # ! ----- EDIT BELOW ----- ! #
-      projectedBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
+      sim$currentBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
 
       sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
                                                        BECkey = sim$BECkey,
-                                                       projectedBEC = projectedBEC,
+                                                       projectedBEC = sim$currentBEC,
                                                        ecoregionMap = sim$ecoregionMap,
                                                        sppEquiv = sim$sppEquiv,
                                                        sppEquivCol = P(sim)$sppEquivCol)
@@ -119,6 +120,12 @@ Init <- function(sim) {
                                                    ecoregionMap = sim$ecoregionMap,
                                                    sppEquiv = sim$sppEquiv,
                                                    sppEquivCol = P(sim)$sppEquivCol)
+  if (time(sim) < 2020) {
+    sim$currentBEC <- sim$projectedBEC$BECref
+  } else {
+    warning("the assisted migration module should start before 2020")
+    sim$currentBEC <- sim$projectedBEC$BEC2020
+  }
 
   return(invisible(sim))
 }
