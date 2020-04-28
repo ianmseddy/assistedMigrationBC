@@ -14,7 +14,7 @@
 generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecoregionMap,
                                       pixelGroupMap, method = 'default', sppEquiv, sppEquivCol) {
 
-  browser()
+
   #get sppEquiv species name from transferTable
   transferTable <- copy(transferTable)
   joinCol <- c('BC_Forestry', eval(sppEquivCol))

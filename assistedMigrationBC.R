@@ -80,30 +80,10 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
 
     },
     plot = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
 
-      #plotFun(sim) # uncomment this, replace with object to plot
-      # schedule future event(s)
-
-      # e.g.,
-      #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "assistedMigrationBC", "plot")
-
-      # ! ----- STOP EDITING ----- ! #
     },
     save = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
 
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + P(sim)$.saveInterval, "assistedMigrationBC", "save")
-
-      # ! ----- STOP EDITING ----- ! #
     },
     updateProvenanceTable = {
       # ! ----- EDIT BELOW ----- ! #
