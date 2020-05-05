@@ -184,11 +184,13 @@ plotFun <- function(sim) {
                                    alsoExtract = 'reclassifiedBECs.gri',
                                    studyArea = sim$studyArea,
                                    rasterToMatch = sim$rasterToMatch,
-                                   purge = 7,
-                                   useCache = TRUE,
+                                   useCache = FALSE,
                                    overwrite = TRUE,
                                    userTags = c(cacheTags, 'flyingBECs')) #assume we only need these for studyArea!
+    NAvalue(sim$projectedBEC) <- 0 #this should have been set before uploading to Google
+
   }
+
   # ! ----- STOP EDITING ----- ! #
   return(invisible(sim))
 }
