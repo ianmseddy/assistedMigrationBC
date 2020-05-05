@@ -183,10 +183,10 @@ plotFun <- function(sim) {
   if (!suppliedElsewhere("transferTable", sim)) {
     sim$transferTable <- prepInputs(url = extractURL('transferTable', sim), destinationPath = dPath,
                                     targetFile = "GregONeilData_Formatted.csv", fun = 'fread')
-    sim$transferTable[, V1 := NULL]
+
   }
 
-  if (!suppliedElsehwere("cohortData", sim)) {
+  if (!suppliedElsewhere("cohortData", sim)) {
     stop("This module needs cohortData. Please run one of Biomass_core or Biomass_borealDataPrep or contact authors")
   }
 
