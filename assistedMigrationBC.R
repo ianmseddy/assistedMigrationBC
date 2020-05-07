@@ -122,16 +122,14 @@ Init <- function(sim) {
                                                    sppEquivCol = P(sim)$sppEquivCol)
 
   #fixes species column - this could be done in a function - it is done anyway in generateBCProvenanceTable
-  transferTable <- sim$transferTable
-  browser() #hwy are swpecies appearing with capitals after underscore wtf
   joinCol <- c('BC_Forestry', eval(P(sim)$sppEquivCol))
   sppEquivSubset <- sim$sppEquiv[, .SD, .SDcols = joinCol]
 
+  transferTable <- sim$transferTable
   transferTable <- transferTable[sppEquivSubset, on = c("species" = "BC_Forestry")]
   transferTable[, species := NULL]
   setnames(transferTable, eval(P(sim)$sppEquivCol), 'speciesCode')
   sim$transferTable <- transferTable
-
 
   if (time(sim) < 2020) {
     sim$currentBEC <- sim$projectedBEC$BECref
@@ -174,15 +172,25 @@ plotFun <- function(sim) {
   if (!suppliedElsewhere("BECkey", sim)) {
     sim$BECkey <- prepInputs(url = extractURL('BECkey', sim),
                              destinationPath = dPath,
-                             fun = 'data.table::fread', useCache = TRUE,
+                             fun = 'read.csv', useCache = FALSE,
                              overwrite = TRUE,
                              userTags = c(cacheTags, 'BECkey'))
+    sim$BECkey <- as.data.table(sim$BECkey) %>%
+      .[, X := NULL] %>%
+      .[ID != 14] #variant with ID 14 was combined with 12 in the raster map,
+    #must be excluded else cartesian join issues... it was incorrecty renamed instead of being removed entirely
   }
 
 
   if (!suppliedElsewhere("transferTable", sim)) {
-    sim$transferTable <- prepInputs(url = extractURL('transferTable', sim), destinationPath = dPath,
-                                    targetFile = "GregONeilData_Formatted.csv", fun = 'fread')
+
+    transferTable <- prepInputs(url = extractURL('transferTable', sim), destinationPath = dPath,
+                                targetFile = "GregONeilData_Formatted.csv",
+                                userTags = c(cacheTags, 'transferTable'),
+                                fun = 'read.csv')
+    transferTable <- as.data.table(transferTable) %>% #don't fread, it is too much of a hassle with cache
+      .[, X := NULL]
+    sim$transferTable <- transferTable
 
   }
 
@@ -199,7 +207,7 @@ plotFun <- function(sim) {
                                    alsoExtract = 'reclassifiedBECs.gri',
                                    studyArea = sim$studyArea,
                                    rasterToMatch = sim$rasterToMatch,
-                                   useCache = FALSE,
+                                   method = 'ngb',
                                    overwrite = TRUE,
                                    userTags = c(cacheTags, 'flyingBECs')) #assume we only need these for studyArea!
     NAvalue(sim$projectedBEC) <- 0 #this should have been set before uploading to Google
