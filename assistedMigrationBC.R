@@ -114,6 +114,13 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
 ### template initialization
 Init <- function(sim) {
 
+  joinCol <- c('BC_Forestry', eval(P(sim)$sppEquivCol))
+  sppEquivSubset <- sim$sppEquiv[, .SD, .SDcols = joinCol]
+
+  sim$transferTable <- sim$transferTable[sppEquivSubset, on = c("species" = "BC_Forestry")]
+  sim$transferTable[, species := NULL]
+  setnames(sim$transferTable, eval(P(sim)$sppEquivCol), 'speciesCode')
+
   sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
                                                    BECkey = sim$BECkey,
                                                    projectedBEC = sim$projectedBEC$BECref,
@@ -122,14 +129,7 @@ Init <- function(sim) {
                                                    sppEquivCol = P(sim)$sppEquivCol)
 
   #fixes species column - this could be done in a function - it is done anyway in generateBCProvenanceTable
-  joinCol <- c('BC_Forestry', eval(P(sim)$sppEquivCol))
-  sppEquivSubset <- sim$sppEquiv[, .SD, .SDcols = joinCol]
 
-  transferTable <- sim$transferTable
-  transferTable <- transferTable[sppEquivSubset, on = c("species" = "BC_Forestry")]
-  transferTable[, species := NULL]
-  setnames(transferTable, eval(P(sim)$sppEquivCol), 'speciesCode')
-  sim$transferTable <- transferTable
 
   if (time(sim) < 2020) {
     sim$currentBEC <- sim$projectedBEC$BECref

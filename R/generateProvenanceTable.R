@@ -12,17 +12,13 @@
 #' @return a provenance table object to be used with LandR_reforestation
 #' @export
 generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecoregionMap,
-                                      pixelGroupMap, method = 'default', sppEquiv, sppEquivCol) {
+                                      method = 'default', sppEquiv, sppEquivCol) {
 
   #get sppEquiv species name from transferTable
-  transferTable <- copy(transferTable)
-  joinCol <- c('BC_Forestry', eval(sppEquivCol))
-  sppEquivSubset <- sppEquiv[, .SD, .SDcols = joinCol]
-  transferTable <- transferTable[sppEquivSubset, on = c("species" = "BC_Forestry")]
-  transferTable[, species := NULL]
-  setnames(transferTable, eval(sppEquivCol), 'speciesCode')
+  TransferTable <- copy(transferTable)
 
-  setkey(transferTable, BECvarfut_plantation)
+
+  setkey(TransferTable, BECvarfut_plantation)
 
 
   #figure out what each pixel will become
@@ -34,13 +30,12 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
   ecoregionTable[, ecoregion := as.factor(ecoregion)]
   currentAndFutureBECs <- currentAndFutureBECs[ecoregionTable, on = c('ecoID' = 'ID')]
 
-  #Join BECkey with transferTable to get the ecoregionID representation of BEC zones
-  #TODO: Fix differences when Elizabeth gets back to you
+  #Join BECkey with TransferTable to get the ecoregionID representation of BEC zones
 
-  transferTable <- BECkey[transferTable, on = c('zsv'= 'BECvarfut_plantation')] %>%
+  TransferTable <- BECkey[TransferTable, on = c('zsv'= 'BECvarfut_plantation')] %>%
     .[!is.na(ID)] #we only need  info re: variants that are actually on landscape
 
-  transferTable <- transferTable[ID %in% currentAndFutureBECs$projEcoregion]
+  TransferTable <- TransferTable[ID %in% currentAndFutureBECs$projEcoregion]
 
   #Current and future BECs must be reduced from pixel index.
   #It will be too much computational strain to find optimal provenance at pixel level
@@ -53,7 +48,7 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
   if (method == "default") {
 
     #subset each ecoregionGroup/species by the minimum height reduction (ie max when expressed as proportion) among provenances
-    optimalProvenance <- transferTable[, score := rank(HTp_pred, ties.method = 'random'), by = .(ID, speciesCode)]
+    optimalProvenance <- TransferTable[, score := rank(HTp_pred, ties.method = 'random'), by = .(ID, speciesCode)]
     optimalProvenance <- optimalProvenance[, best := max(score), .(ID, speciesCode)]
     optimalProvenance <- optimalProvenance[score == best,]
 
@@ -67,8 +62,9 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
     stop("unrecognized method")
   }
 
-  #currentAndFutureBECs can now be joined with transferTable to find the optimal provenance per ecoregion
+  #currentAndFutureBECs can now be joined with TransferTable to find the optimal provenance per ecoregion
   #each projected Ecoregion may have multiple species, while each ecoregion has many ecoregionGroups, hence cartesian
+  #provenanceTable may be modified by LandR package - must correc this
 
   provenanceTable <- provenanceTable[currentAndFutureBECs, on  = c("ID" = 'projEcoregion'), allow.cartesian = TRUE] %>%
     .[, .SD, .SDcols = c("ecoregionGroup", 'speciesCode', 'Provenance')]
