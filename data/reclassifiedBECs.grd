@@ -1,0 +1,25 @@
+[general]
+creator=R package 'raster'
+created=2020-04-08 15:36:30
+[georeference]
+nrows=1402
+ncols=3001
+xmin=-139.06320465
+ymin=48.31739635
+xmax=-114.05497135
+ymax=60.00068295
+projection=+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0
+[data]
+datatype=FLT4S
+byteorder=little
+nbands=4
+bandorder=BIL
+minvalue=1:1:1:1
+maxvalue=204:204:204:204
+nodatavalue=-3.4e+38
+[legend]
+legendtype=
+values=
+color=
+[description]
+layername=BECref:BEC2020:BEC2050:BEC2080
