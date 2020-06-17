@@ -31,9 +31,7 @@ defineModule(sim, list(
                           "This is generally intended for data-type modules, where stochasticity",
                           "and time are not relevant")),
     defineParameter("sppEquivCol", "character", "Boreal", NA, NA,
-                    "The column in sim$specieEquivalency data.table to use as a naming convention"),
-    defineParameter('doAssistedMigration', 'logical', TRUE, NA, NA,
-                    "If TRUE, provenance table will be updated in 2020, 2050, and 2080")
+                    "The column in sim$specieEquivalency data.table to use as a naming convention")
   ),
   inputObjects = bind_rows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
@@ -79,9 +77,8 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       # schedule future event(s)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "assistedMigrationBC", "plot")
       sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "assistedMigrationBC", "save")
-      if (P(sim)$doAssistedMigration) {
-        sim <- scheduleEvent(sim, 2020, 'assistedMigrationBC', 'updateProvenanceTable')
-      }
+      sim <- scheduleEvent(sim, 2020, 'assistedMigrationBC', 'updateProvenanceTable')
+
     },
     plot = {
 
@@ -99,7 +96,7 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
                                                        ecoregionMap = sim$ecoregionMap,
                                                        sppEquiv = sim$sppEquiv,
                                                        sppEquivCol = P(sim)$sppEquivCol)
-      if (time(sim) <= 2080) {
+      if (time(sim) < 2080) {
         #The bECs update every 30 years REF - 2020, 2050, 2080
         sim  <- scheduleEvent(sim, time(sim) + 30, "assistedMigrationBC", 'updateProvenanceTable')
       }
