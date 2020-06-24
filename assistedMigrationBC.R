@@ -153,6 +153,8 @@ Init <- function(sim) {
 
 assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
 
+  cohortCols <- colnames(cohortData)
+  cohortData <- copy(cohortData)
   ecoregionKey <- as.data.table(ecoregionMap@data@attributes[[1]])
   setnames(ecoregionKey, 'ID', 'ecoregionMapCode') #Change ID, because ID in BECkey = ecoregion, not mapcode
   BECkey[, ID := as.factor(as.character(ID))]
@@ -161,20 +163,36 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
   ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
 
   if (is.null(cohortData$Provenance)){
-    cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age)] %>%
-      ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
+    cohortData <- cohortData[ecoregionKeySmall, on = c("ecoregionGroup" = 'ecoregionGroup')]
     setnames(cohortData, 'zsv', 'Provenance')
+    setcolorder(cohortData, c(cohortCols, 'Provenance'))
   } else {
-    cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age, Provenance)] %>%
-      ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
+    cohortData <- cohortData[ecoregionKeySmall, on = c("ecoregionGroup" = 'ecoregionGroup')]
     setnames(cohortData, 'zsv', 'assumedProvenance')
     cohortData[is.na(Provenance), Provenance := assumedProvenance]
     cohortData[, assumedProvenance := NULL] #Confirm this doesn't erase parts of Provenance by reference
-  }
+    setcolorder(cohortData, cohortCols)
+    }
   return(cohortData)
 }
 ### template for save event
-
+#how cohortData was joined before in Biomass_core
+# commonNames <- names(predObj)[names(predObj) %in% names(subCohortData)]
+# if (!is.null(subCohortData$Provenance) & any(is.na(subCohortData$Provenance))){
+#   #This occurs when new cohorts are initiated from dispersal or regeneration
+#   #they are asigned provenance in function, and must be joined separately
+#   newCohorts <- subCohortData[is.na(Provenance)]
+#   newCohorts[, Provenance := NULL]
+#   notProv = commonNames[!commonNames %in% 'Provenance']
+#   newCohorts <- predObj[newCohorts, on = notProv]
+#
+#   oldCohorts <- subCohortData[!is.na(Provenance),]
+#   oldCohorts <- predObj[oldCohorts, on = commonNames]
+#   setcolorder(newCohorts, colnames(oldCohorts))
+#
+#   subCohortData <- rbind(newCohorts, oldCohorts)
+#
+# }
 .inputObjects <- function(sim) {
 
   cacheTags <- c(currentModule(sim), "function:.inputObjects") ## uncomment this if Cache is being used
