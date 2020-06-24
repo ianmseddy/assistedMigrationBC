@@ -77,29 +77,35 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       sim <- Init(sim)
 
       # schedule future event(s)
+      sim <- scheduleEvent(sim, start(sim), 'assistedMigrationBC', 'assignProvenance')
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "assistedMigrationBC", "plot")
       sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "assistedMigrationBC", "save")
-      if (P(sim)$doAssistedMigration) {
-        sim <- scheduleEvent(sim, 2020, 'assistedMigrationBC', 'updateProvenanceTable')
+      sim <- scheduleEvent(sim, 2020, 'assistedMigrationBC', 'updateProvenanceTable')
+
+    },
+
+    assignProvenance = {
+      if (is.null(sim$cohortData$Provenance) | any(is.na(sim$cohortData$Provenance))) {
+        sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
+                                           ecoregionMap = sim$ecoregionMap,
+                                           BECkey = sim$BECkey)
       }
-    },
-    plot = {
-
-    },
-    save = {
-
+      scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
+      #this is post-dispersal, but before growth and mortality
     },
     updateProvenanceTable = {
+
       # ! ----- EDIT BELOW ----- ! #
       sim$currentBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
 
-      sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
-                                                       BECkey = sim$BECkey,
-                                                       projectedBEC = sim$currentBEC,
-                                                       ecoregionMap = sim$ecoregionMap,
-                                                       sppEquiv = sim$sppEquiv,
-                                                       sppEquivCol = P(sim)$sppEquivCol)
-
+      if (P(sim)$doAssistedMigration){
+        sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
+                                                         BECkey = sim$BECkey,
+                                                         projectedBEC = sim$currentBEC,
+                                                         ecoregionMap = sim$ecoregionMap,
+                                                         sppEquiv = sim$sppEquiv,
+                                                         sppEquivCol = P(sim)$sppEquivCol)
+      }
       if (time(sim) < 2080) {
         #The bECs update every 30 years REF - 2020, 2050, 2080
         sim  <- scheduleEvent(sim, time(sim) + 30, "assistedMigrationBC", 'updateProvenanceTable')
@@ -145,25 +151,29 @@ Init <- function(sim) {
   return(invisible(sim))
 }
 
-### template for save events
-Save <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # do stuff for this event
-  sim <- saveFiles(sim)
+assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
 
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
+  ecoregionKey <- as.data.table(ecoregionMap@data@attributes[[1]])
+  setnames(ecoregionKey, 'ID', 'ecoregionMapCode') #Change ID, because ID in BECkey = ecoregion, not mapcode
+  BECkey[, ID := as.factor(as.character(ID))]
+
+  ecoregionKey <- BECkey[ecoregionKey, on = c("ID" = 'ecoregion')] #now we have zsv of cohortData$ecoregionGroup
+  ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
+
+  if (is.null(cohortData$Provenance)){
+    cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age)] %>%
+      ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
+    setnames(cohortData, 'zsv', 'Provenance')
+  } else {
+    cohortData <- cohortData[, .(speciesCode, ecoregionGroup, pixelGroup, age, Provenance)] %>%
+      ecoregionKeySmall[., on = c("ecoregionGroup" = 'ecoregionGroup')]
+    setnames(cohortData, 'zsv', 'assumedProvenance')
+    cohortData[is.na(Provenance), Provenance := assumedProvenance]
+    cohortData[, assumedProvenance := NULL] #Confirm this doesn't erase parts of Provenance by reference
+  }
+  return(cohortData)
 }
-
-### template for plot events
-plotFun <- function(sim) {
-  # ! ----- EDIT BELOW ----- ! #
-  # do stuff for this event
-  #Plot(sim$object)
-
-  # ! ----- STOP EDITING ----- ! #
-  return(invisible(sim))
-}
+### template for save event
 
 .inputObjects <- function(sim) {
 
