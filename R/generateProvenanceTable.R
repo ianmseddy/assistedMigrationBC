@@ -16,8 +16,7 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
 
   #get sppEquiv species name from transferTable
   TransferTable <- copy(transferTable)
-
-
+  BECkey <- copy(BECkey) #to prevent problems arising from factor to integer conversions in other functions
   setkey(TransferTable, BECvarfut_plantation)
 
 
@@ -44,6 +43,19 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
     .[, mode := max(N), .(ecoID)] %>%
     .[N == mode, .SD, .SDcols = c("ecoregionGroup", 'projEcoregion')]
 
+
+  #remove ties - this is likely when there are 2 pixels each
+  if (nrow(currentAndFutureBECs) > length(unique(currentAndFutureBECs$ecoregionGroup))) {
+    #ties exist
+    currentAndFutureBECs[, N := .N, .(ecoregionGroup)]
+    noTies <- currentAndFutureBECs[N == 1]
+    ties <- currentAndFutureBECs[N > 1]
+    ties$foo <- sample(x = 1:nrow(ties), size = nrow(ties))
+    setkey(ties, foo)
+    ties <- ties[!duplicated(ties[, .(ecoregionGroup)])]
+    ties[, foo := NULL]
+    currentAndFutureBECs <- rbind(ties, noTies)
+  }
   # Noww projEcoregion = what it will become, and ecoregion = the original ecoregion
   if (method == "default") {
 
@@ -64,7 +76,6 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
 
   #currentAndFutureBECs can now be joined with TransferTable to find the optimal provenance per ecoregion
   #each projected Ecoregion may have multiple species, while each ecoregion has many ecoregionGroups, hence cartesian
-  #provenanceTable may be modified by LandR package - must correc this
 
   provenanceTable <- provenanceTable[currentAndFutureBECs, on  = c("ID" = 'projEcoregion'), allow.cartesian = TRUE] %>%
     .[, .SD, .SDcols = c("ecoregionGroup", 'speciesCode', 'Provenance')]
