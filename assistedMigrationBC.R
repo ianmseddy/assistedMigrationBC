@@ -264,6 +264,7 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
                                    overwrite = TRUE,
                                    userTags = c(cacheTags, 'flyingBECs')) #assume we only need these for studyArea!
     NAvalue(sim$projectedBEC) <- 0 #this should have been set before uploading to Google
+    names(sim$projectedBEC) <- c("BECref", "BEC2020", "BEC2050", "BEC2080")
 
   }
 
