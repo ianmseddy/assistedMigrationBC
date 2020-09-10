@@ -159,7 +159,7 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
   BECkey <- copy(BECkey)
   ecoregionKey <- as.data.table(ecoregionMap@data@attributes[[1]])
   setnames(ecoregionKey, 'ID', 'ecoregionMapCode') #Change ID, because ID in BECkey = ecoregion, not mapcode
-  BECkey[, ID := as.factor(as.character(ID))]
+  BECkey[, ID := as.factor(paddedFloatToChar(ID, padL = 2))]
 
   ecoregionKey <- BECkey[ecoregionKey, on = c("ID" = 'ecoregion')] #now we have zsv of cohortData$ecoregionGroup
   ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
@@ -255,6 +255,7 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
 
     sim$projectedBEC <- prepInputs(targetFile = 'reclassifiedBECs.grd',
                                    url = extractURL("projectedBEC", sim),
+                                   filename2 = NULL,
                                    destinationPath = dPath,
                                    fun = "raster::stack",
                                    alsoExtract = 'reclassifiedBECs.gri',
