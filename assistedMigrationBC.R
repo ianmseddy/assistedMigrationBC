@@ -77,10 +77,14 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       sim <- Init(sim)
 
       # schedule future event(s)
-      sim <- scheduleEvent(sim, start(sim), 'assistedMigrationBC', 'assignProvenance')
+      sim <- scheduleEvent(sim, start(sim), 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "assistedMigrationBC", "plot")
       sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "assistedMigrationBC", "save")
-      sim <- scheduleEvent(sim, 2020, 'assistedMigrationBC', 'updateProvenanceTable')
+      sim <- scheduleEvent(sim, 2020, 'assistedMigrationBC', 'updateProvenanceTable', eventPriority = 1)
+      sim <- scheduleEvent(sim, 2050, 'assistedMigrationBC', 'updateProvenanceTable', eventPriority = 1)
+      sim <- scheduleEvent(sim, 2080, 'assistedMigrationBC', 'updateProvenanceTable', eventPriority = 1)
+      sim <- scheduleEvent(sim, end(sim), 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
+      #as sim may end with dispersal event, leaving some provenances undefined
 
     },
 
@@ -107,10 +111,7 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
                                                          sppEquiv = sim$sppEquiv,
                                                          sppEquivCol = P(sim)$sppEquivCol)
       }
-      if (time(sim) < 2080) {
-        #The bECs update every 30 years REF - 2020, 2050, 2080
-        sim  <- scheduleEvent(sim, time(sim) + 30, "assistedMigrationBC", 'updateProvenanceTable')
-      }
+
     },
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
@@ -123,6 +124,16 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
 
 ### template initialization
 Init <- function(sim) {
+
+  if (time(sim) < 2020) {
+    sim$currentBEC <- sim$projectedBEC$BECref
+  } else if (time(sim) < 2050) {
+    sim$currentBEC <- sim$projectedBEC$BEC2020
+  } else if (time(sim) < 2080) {
+    sim$currentBEC <- sim$projectedBEC$BEC2050
+  } else {
+    sim$currentBEC <- siM$projectedBEC$BEC2080
+  }
 
   joinCol <- c('BC_Forestry', eval(P(sim)$sppEquivCol))
   sppEquivSubset <- sim$sppEquiv[, .SD, .SDcols = joinCol]
@@ -141,13 +152,6 @@ Init <- function(sim) {
   #fixes species column - this could be done in a function - it is done anyway in generateBCProvenanceTable
 
 
-  if (time(sim) < 2020) {
-    sim$currentBEC <- sim$projectedBEC$BECref
-  } else {
-    warning("the assisted migration module should probably start before 2020")
-    sim$currentBEC <- sim$projectedBEC$BEC2020
-
-  }
 
   return(invisible(sim))
 }
@@ -172,7 +176,7 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
     cohortData <- cohortData[ecoregionKeySmall, on = c("ecoregionGroup" = 'ecoregionGroup')]
     setnames(cohortData, 'zsv', 'assumedProvenance')
     cohortData[is.na(Provenance), Provenance := assumedProvenance]
-    cohortData[, assumedProvenance := NULL] #Confirm this doesn't erase parts of Provenance by reference
+    cohortData[, assumedProvenance := NULL]
     setcolorder(cohortData, cohortCols)
   }
 
@@ -197,24 +201,7 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
 
   return(cohortData)
 }
-### template for save event
-#how cohortData was joined before in Biomass_core
-# commonNames <- names(predObj)[names(predObj) %in% names(subCohortData)]
-# if (!is.null(subCohortData$Provenance) & any(is.na(subCohortData$Provenance))){
-#   #This occurs when new cohorts are initiated from dispersal or regeneration
-#   #they are asigned provenance in function, and must be joined separately
-#   newCohorts <- subCohortData[is.na(Provenance)]
-#   newCohorts[, Provenance := NULL]
-#   notProv = commonNames[!commonNames %in% 'Provenance']
-#   newCohorts <- predObj[newCohorts, on = notProv]
-#
-#   oldCohorts <- subCohortData[!is.na(Provenance),]
-#   oldCohorts <- predObj[oldCohorts, on = commonNames]
-#   setcolorder(newCohorts, colnames(oldCohorts))
-#
-#   subCohortData <- rbind(newCohorts, oldCohorts)
-#
-# }
+
 .inputObjects <- function(sim) {
 
   cacheTags <- c(currentModule(sim), "function:.inputObjects") ## uncomment this if Cache is being used

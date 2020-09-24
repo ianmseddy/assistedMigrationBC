@@ -56,7 +56,7 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
     ties[, foo := NULL]
     currentAndFutureBECs <- rbind(ties, noTies)
   }
-  # Noww projEcoregion = what it will become, and ecoregion = the original ecoregion
+  # Noww rojEcoregion = what it became , and ecoregion = the original ecoregion
   if (method == "default") {
 
     #subset each ecoregionGroup/species by the minimum height reduction (ie max when expressed as proportion) among provenances
