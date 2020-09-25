@@ -95,12 +95,16 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
         sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
                                            ecoregionMap = sim$ecoregionMap,
                                            BECkey = sim$BECkey)
+
+        if (P(sim)$trackHarvest) {
+          sim$cohortData[is.na(harvested), harvested := FALSE]
+        }
       }
       sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
       #this is post-dispersal, but before growth and mortality
     },
     updateProvenanceTable = {
-
+      browser()
       # ! ----- EDIT BELOW ----- ! #
       sim$currentBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
 
@@ -153,7 +157,7 @@ Init <- function(sim) {
   #fixes species column - this could be done in a function - it is done anyway in generateBCProvenanceTable
  if (P(sim)$trackHarvest) {
    #assume nothing is harvested at start(sim)
-   sim$cohortData[, harvested := NA]
+   sim$cohortData[, harvested := FALSE]
  }
 
 
