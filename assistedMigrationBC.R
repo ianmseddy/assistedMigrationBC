@@ -33,7 +33,8 @@ defineModule(sim, list(
     defineParameter("sppEquivCol", "character", "Boreal", NA, NA,
                     "The column in sim$specieEquivalency data.table to use as a naming convention"),
     defineParameter("doAssistedMigration", 'logical', TRUE, NA, NA,
-                    "if TRUE, provenance table is updated at 2020, 2050, and 2080")
+                    "if TRUE, provenance table is updated at 2020, 2050, and 2080"),
+    defineParameter("trackHarvest", 'logical', FALSE, NA, NA, 'if true, adds column to cohortData for tracking harvest')
   ),
   inputObjects = bind_rows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
@@ -150,7 +151,10 @@ Init <- function(sim) {
                                                    sppEquivCol = P(sim)$sppEquivCol)
 
   #fixes species column - this could be done in a function - it is done anyway in generateBCProvenanceTable
-
+ if (P(sim)$trackHarvest) {
+   #assume nothing is harvested at start(sim)
+   sim$cohortData[, harvested := NA]
+ }
 
 
   return(invisible(sim))
