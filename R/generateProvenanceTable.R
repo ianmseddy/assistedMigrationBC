@@ -63,13 +63,14 @@ generateBCProvenanceTable <- function(transferTable, BECkey, projectedBEC, ecore
     optimalProvenance <- TransferTable[, score := rank(HTp_pred, ties.method = 'random'), by = .(ID, speciesCode)]
     optimalProvenance <- optimalProvenance[, best := max(score), .(ID, speciesCode)]
     optimalProvenance <- optimalProvenance[score == best,]
-
     setnames(optimalProvenance, old = 'BECvar_seed', new = "Provenance")
-
     provenanceTable <- optimalProvenance[, .(ID, Provenance, speciesCode)]
 
-  } else if (method == "Elizabeth's other ideas") {
-    #implement Elizabeth's other ideas here
+  } else if (method == "noOptimization") {
+    sameProvenance <- TransferTable[BECvar_seed == zsv]
+    setnames(sameProvenance, old = c('BECvar_seed'), new = c("Provenance"))
+    provenanceTable <- sameProvenance[, .(ID, Provenance, speciesCode)]
+
   } else {
     stop("unrecognized method")
   }

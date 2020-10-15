@@ -34,7 +34,8 @@ defineModule(sim, list(
                     "The column in sim$specieEquivalency data.table to use as a naming convention"),
     defineParameter("doAssistedMigration", 'logical', TRUE, NA, NA,
                     "if TRUE, provenance table is updated at 2020, 2050, and 2080"),
-    defineParameter("trackHarvest", 'logical', FALSE, NA, NA, 'if true, adds column to cohortData for tracking harvest')
+    defineParameter("optimizeProvenanceTable", 'logical', TRUE, NA, NA, 'if FALSE, will only plant what is present'),
+    defineParameter("trackPlanting", 'logical', FALSE, NA, NA, 'if true, adds column to cohortData for tracking harvest')
   ),
   inputObjects = bind_rows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
@@ -94,17 +95,16 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       if (is.null(sim$cohortData$Provenance) | any(is.na(sim$cohortData$Provenance))) {
         sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
                                            ecoregionMap = sim$ecoregionMap,
-                                           BECkey = sim$BECkey)
+                                           BECkey = sim$BECkey, time = time(sim))
 
-        if (P(sim)$trackHarvest) {
-          sim$cohortData[is.na(harvested), harvested := FALSE]
+        if (P(sim)$trackPlanting) {
+          sim$cohortData[is.na(planted), planted := FALSE]
         }
       }
       sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
       #this is post-dispersal, but before growth and mortality
     },
     updateProvenanceTable = {
-      browser()
       # ! ----- EDIT BELOW ----- ! #
       sim$currentBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
 
@@ -147,24 +147,34 @@ Init <- function(sim) {
   sim$transferTable[, species := NULL]
   setnames(sim$transferTable, eval(P(sim)$sppEquivCol), 'speciesCode')
 
+  if (P(sim)$optimizeProvenanceTable) {
   sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
                                                    BECkey = sim$BECkey,
                                                    projectedBEC = sim$projectedBEC$BECref,
                                                    ecoregionMap = sim$ecoregionMap,
                                                    sppEquiv = sim$sppEquiv,
                                                    sppEquivCol = P(sim)$sppEquivCol)
+  } else {
+    sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
+                                                     BECkey = sim$BECkey,
+                                                     projectedBEC = sim$projectedBEC$BECref,
+                                                     ecoregionMap = sim$ecoregionMap,
+                                                     sppEquiv = sim$sppEquiv,
+                                                     sppEquivCol = P(sim)$sppEquivCol,
+                                                     method = 'noOptimization')
+    #this could obviously be combined into one function call - todo later.
+  }
 
-  #fixes species column - this could be done in a function - it is done anyway in generateBCProvenanceTable
- if (P(sim)$trackHarvest) {
-   #assume nothing is harvested at start(sim)
-   sim$cohortData[, harvested := FALSE]
+ if (P(sim)$trackPlanting) {
+   #assume nothing is planted at start(sim)
+   sim$cohortData[, planted := FALSE]
  }
 
 
   return(invisible(sim))
 }
 
-assignProvenance <- function(cohortData, ecoregionMap, BECkey) {
+assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim)) {
 
   cohortCols <- colnames(cohortData)
   cohortData <- copy(cohortData)
