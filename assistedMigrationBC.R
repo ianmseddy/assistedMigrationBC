@@ -133,10 +133,12 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
                            pixelGroup = getValues(sim$pixelGroupMap))
       pgLong <- na.omit(pgLong)
       plantedCohorts <- sim$cohortData[planted == TRUE,]
+      plantedCohorts <- copy(plantedCohorts) #don't let ageBin sneak into cohortData
       plantedCohorts <- pgLong[plantedCohorts, on = c("pixelGroup")]
       set(plantedCohorts, NULL, 'year', time(sim))
       if (!is.na(P(sim)$trackSiteIndexOnly)) {
-        plantedCohorts <- plantedCohorts[age %in% P(sim)$trackSiteIndexOnly,]
+        set(plantedCohorts, NULL, 'ageBin', value = floor(age/10) * 10)
+        plantedCohorts <- plantedCohorts[ageBin %in% P(sim)$trackSiteIndexOnly,]
       }
       if (is.null(sim$plantedCohorts)){
         sim$plantedCohorts <- plantedCohorts
