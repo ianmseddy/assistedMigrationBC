@@ -6,8 +6,8 @@
 ## If exact location is required, functions will be: `sim$<moduleName>$FunctionName`.
 defineModule(sim, list(
   name = "assistedMigrationBC",
-  description = "",
-  keywords = "",
+  description = "assisted migration in British Columbia - very idiosyncratic",
+  keywords = "genetics",
   authors = structure(list(list(given = c("Ian"), family = "Eddy", role = c("aut", "cre"), email = "ian.eddy@canada.com", comment = NULL)), class = "person"),
   childModules = character(0),
   version = list(SpaDES.core = "1.0.0.9000", assistedMigrationBC = "0.0.0.9000"),
@@ -66,8 +66,8 @@ defineModule(sim, list(
     createsOutput(objectName = 'provenanceTable', objectClass = 'data.table',
                   desc = 'a table that dictates what species are planted at what locations. Has columns ecoregionGroup, species, provenance'),
     createsOutput(objectName = "currentBEC", objectClass = 'RasterLayer', desc = "the projected BEC zones at time(sim)"),
-    createsOutput('plantedCohorts', objectClass = 'data.table',
-                  desc = "if P(sim)$trackPlantedCohorts is true, a cohort data.table of only planted cohorts")
+    createsOutput(objectName = "summarySubCohortData", objectClass = 'data.table',
+                  desc = "landscape summary")
   )
 ))
 
@@ -92,7 +92,8 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       sim <- scheduleEvent(sim, 2050, 'assistedMigrationBC', 'updateProvenanceTable', eventPriority = 1)
       sim <- scheduleEvent(sim, 2080, 'assistedMigrationBC', 'updateProvenanceTable', eventPriority = 1)
       sim <- scheduleEvent(sim, end(sim), 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
-      #as sim may end with dispersal event, leaving some provenances undefined
+      sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'landscapeSummary', eventPriority = 9)
+       #as sim may end with dispersal event, leaving some provenances undefined
       if (P(sim)$trackPlantedCohorts) {
         sim <- scheduleEvent(sim, start(sim), 'assistedMigrationBC', 'trackPlantedCohorts', eventPriority = 10)
       }
@@ -114,9 +115,7 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       #this is post-dispersal, but before growth and mortality
     },
     updateProvenanceTable = {
-      # ! ----- EDIT BELOW ----- ! #
       sim$currentBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
-
       if (P(sim)$doAssistedMigration){
         sim$provenanceTable <- generateBCProvenanceTable(transferTable = sim$transferTable,
                                                          BECkey = sim$BECkey,
@@ -131,7 +130,7 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
     trackPlantedCohorts = {
       pgLong <- data.table(pixelID = 1:ncell(sim$pixelGroupMap),
                            pixelGroup = getValues(sim$pixelGroupMap))
-      pgLong <- na.omit(pgLong)
+      pgLong <- pgLong[!is.na(pixelGroup)]
       plantedCohorts <- sim$cohortData[planted == TRUE,]
       plantedCohorts <- copy(plantedCohorts) #don't let ageBin sneak into cohortData
       set(plantedCohorts, NULL, 'year', time(sim))
@@ -139,18 +138,31 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
         set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
         plantedCohorts <- plantedCohorts[ageBin %in% P(sim)$trackSiteIndexOnly,]
       }
-      pgs <- unique(plantedCohorts$pixelGroup)
-      plantedCohorts <- sim$cohortData[pixelGroup %in% pgs,] #preserves ingress
-      set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
-      plantedCohorts <- pgLong[plantedCohorts, on = c("pixelGroup")]
-      if (is.null(sim$plantedCohorts)){
-        sim$plantedCohorts <- plantedCohorts
-      } else {
-        sim$plantedCohorts <- rbind(sim$plantedCohorts, plantedCohorts)
+      if (!nrow(plantedCohorts) == 0) {
+        pgs <- unique(plantedCohorts$pixelGroup)
+        plantedCohorts <- sim$cohortData[pixelGroup %in% pgs,] #preserves ingress
+        set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
+        plantedCohorts <- pgLong[plantedCohorts, on = c("pixelGroup")]
+        saveRDS(plantedCohorts, file.path(outputPath(sim), paste0('planted',time(sim), '.rds')))
+        rm(pgLong, pgs)
+
       }
-      rm(pgLong, pgs, plantedCohorts)
-      sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'trackPlantedCohorts', eventPriority = 5.5)
+      rm(plantedCohorts)
+
+      sim <- scheduleEvent(sim, time(sim) + 10, 'assistedMigrationBC', 'trackPlantedCohorts', eventPriority = 5.5)
     },
+
+    landscapeSummary = {
+      landscapeSnapshot <- landscapeCalc(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap, time = time(sim))
+      if (!is.null(sim$summarySubCohortData)){
+        sim$summarySubCohortData <- rbind(sim$summarySubCohortData, landscapeSnapshot)
+      } else {
+        sim$summarySubCohortData <- landscapeSnapshot
+      }
+      sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'landscapeSummary', eventPriority = 8)
+
+    },
+
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
                   "\' in module \'", current(sim)[1, "moduleName", with = FALSE], "\'", sep = ""))
   )
