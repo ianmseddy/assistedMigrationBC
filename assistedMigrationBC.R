@@ -143,6 +143,7 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
         plantedCohorts <- sim$cohortData[pixelGroup %in% pgs,] #preserves ingress
         set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
         plantedCohorts <- pgLong[plantedCohorts, on = c("pixelGroup")]
+        plantedCohorts$year <- time(sim)
         saveRDS(plantedCohorts, file.path(outputPath(sim), paste0('planted',time(sim), '.rds')))
         rm(pgLong, pgs)
 
