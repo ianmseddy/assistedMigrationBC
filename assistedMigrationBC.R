@@ -128,38 +128,40 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
     },
 
     trackPlantedCohorts = {
-      pgLong <- data.table(pixelID = 1:ncell(sim$pixelGroupMap),
-                           pixelGroup = getValues(sim$pixelGroupMap))
-      pgLong <- pgLong[!is.na(pixelGroup)]
-      plantedCohorts <- sim$cohortData[planted == TRUE,]
-      plantedCohorts <- copy(plantedCohorts) #don't let ageBin sneak into cohortData
-      set(plantedCohorts, NULL, 'year', time(sim))
-      if (!all(is.na(P(sim)$trackSiteIndexOnly))) {
-        set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
-        plantedCohorts <- plantedCohorts[ageBin %in% P(sim)$trackSiteIndexOnly,]
-      }
-      if (!nrow(plantedCohorts) == 0) {
-        pgs <- unique(plantedCohorts$pixelGroup)
-        plantedCohorts <- sim$cohortData[pixelGroup %in% pgs,] #preserves ingress
-        set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
-        plantedCohorts <- pgLong[plantedCohorts, on = c("pixelGroup")]
-        plantedCohorts$year <- time(sim)
-        saveRDS(plantedCohorts, file.path(outputPath(sim), paste0('planted',time(sim), '.rds')))
-        rm(pgLong, pgs)
+      if (P(sim)$trackPlantedCohorts) {
+        pgLong <- data.table(pixelID = 1:ncell(sim$pixelGroupMap),
+                             pixelGroup = getValues(sim$pixelGroupMap))
+        pgLong <- pgLong[!is.na(pixelGroup)]
+        plantedCohorts <- sim$cohortData[planted == TRUE,]
+        plantedCohorts <- copy(plantedCohorts) #don't let ageBin sneak into cohortData
+        set(plantedCohorts, NULL, 'year', time(sim))
+        if (!all(is.na(P(sim)$trackSiteIndexOnly))) {
+          set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
+          plantedCohorts <- plantedCohorts[ageBin %in% P(sim)$trackSiteIndexOnly,]
+        }
+        if (!nrow(plantedCohorts) == 0) {
+          pgs <- unique(plantedCohorts$pixelGroup)
+          plantedCohorts <- sim$cohortData[pixelGroup %in% pgs,] #preserves ingress
+          set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
+          plantedCohorts <- pgLong[plantedCohorts, on = c("pixelGroup")]
+          plantedCohorts$year <- time(sim)
+          saveRDS(plantedCohorts, file.path(outputPath(sim), paste0('planted',time(sim), '.rds')))
+          rm(pgLong, pgs)
 
-      }
-      rm(plantedCohorts)
+        }
+        rm(plantedCohorts)
 
-      sim <- scheduleEvent(sim, time(sim) + 10, 'assistedMigrationBC', 'trackPlantedCohorts', eventPriority = 5.5)
+        sim <- scheduleEvent(sim, time(sim) + 10, 'assistedMigrationBC', 'trackPlantedCohorts', eventPriority = 5.5)
+      }
     },
 
     landscapeSummary = {
-      landscapeSnapshot <- landscapeCalc(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap, time = time(sim))
-      if (!is.null(sim$summarySubCohortData)){
-        sim$summarySubCohortData <- rbind(sim$summarySubCohortData, landscapeSnapshot)
-      } else {
-        sim$summarySubCohortData <- landscapeSnapshot
-      }
+      # landscapeSnapshot <- landscapeCalc(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap, time = time(sim))
+      # if (!is.null(sim$summarySubCohortData)){
+      #   sim$summarySubCohortData <- rbind(sim$summarySubCohortData, landscapeSnapshot)
+      # } else {
+      #   sim$summarySubCohortData <- landscapeSnapshot
+      # }
       sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'landscapeSummary', eventPriority = 8)
 
     },
