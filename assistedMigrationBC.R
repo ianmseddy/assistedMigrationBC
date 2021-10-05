@@ -34,11 +34,11 @@ defineModule(sim, list(
                     "The column in sim$specieEquivalency data.table to use as a naming convention"),
     defineParameter("doAssistedMigration", 'logical', TRUE, NA, NA,
                     "if TRUE, provenance table is updated at 2020, 2050, and 2080"),
+    defineParameter("landscapeSummaryTime", "numeric", 10, NA, NA,
+                    desc = "how often to save object with every planted cohort"),
     defineParameter("optimizeProvenanceTable", 'logical', TRUE, NA, NA, 'if FALSE, will only plant what is present'),
-    defineParameter("trackPlanting", 'logical', FALSE, NA, NA, 'if true, adds column to cohortData for tracking harvest'),
-    defineParameter("trackPlantedCohorts", 'logical', TRUE, NA, NA, 'if TRUE, save cohortData of planted cohorts annually'),
-    defineParameter("trackSiteIndexOnly", 'numeric', c(50, 30), NA, NA,
-                    desc = 'if trackPlanting is TRUE, only these age classes will be recorded annually (saves memory)')
+    defineParameter("trackPlanting", 'logical', FALSE, NA, NA,
+                    desc = 'if true, adds column to cohortData for tracking harvest')
   ),
   inputObjects = bind_rows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
@@ -66,8 +66,7 @@ defineModule(sim, list(
     createsOutput(objectName = 'provenanceTable', objectClass = 'data.table',
                   desc = 'a table that dictates what species are planted at what locations. Has columns ecoregionGroup, species, provenance'),
     createsOutput(objectName = "currentBEC", objectClass = 'RasterLayer', desc = "the projected BEC zones at time(sim)"),
-    createsOutput(objectName = "summarySubCohortData", objectClass = 'data.table',
-                  desc = "landscape summary")
+    createsOutput(objectName = "plantedCohorts", objectClass = 'data.table', desc = "planted cohort summary")
   )
 ))
 
@@ -92,12 +91,9 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       sim <- scheduleEvent(sim, 2050, 'assistedMigrationBC', 'updateProvenanceTable', eventPriority = 1)
       sim <- scheduleEvent(sim, 2080, 'assistedMigrationBC', 'updateProvenanceTable', eventPriority = 1)
       sim <- scheduleEvent(sim, end(sim), 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
-      sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'landscapeSummary', eventPriority = 9)
-       #as sim may end with dispersal event, leaving some provenances undefined
-      if (P(sim)$trackPlantedCohorts) {
-        sim <- scheduleEvent(sim, start(sim), 'assistedMigrationBC', 'trackPlantedCohorts', eventPriority = 10)
+      if (!is.na(P(sim)$landscapeSummaryTime)) {
+        sim <- scheduleEvent(sim, start(sim), 'assistedMigrationBC', 'landscapeSummary', eventPriority = 9)
       }
-
     },
 
     assignProvenance = {
@@ -126,44 +122,14 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       }
 
     },
-
-    trackPlantedCohorts = {
-      if (P(sim)$trackPlantedCohorts) {
-        pgLong <- data.table(pixelID = 1:ncell(sim$pixelGroupMap),
-                             pixelGroup = getValues(sim$pixelGroupMap))
-        pgLong <- pgLong[!is.na(pixelGroup)]
-        plantedCohorts <- sim$cohortData[planted == TRUE,]
-        plantedCohorts <- copy(plantedCohorts) #don't let ageBin sneak into cohortData
-        set(plantedCohorts, NULL, 'year', time(sim))
-        if (!all(is.na(P(sim)$trackSiteIndexOnly))) {
-          set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
-          plantedCohorts <- plantedCohorts[ageBin %in% P(sim)$trackSiteIndexOnly,]
-        }
-        if (!nrow(plantedCohorts) == 0) {
-          pgs <- unique(plantedCohorts$pixelGroup)
-          plantedCohorts <- sim$cohortData[pixelGroup %in% pgs,] #preserves ingress
-          set(plantedCohorts, NULL, 'ageBin', value = floor(plantedCohorts$age/10) * 10)
-          plantedCohorts <- pgLong[plantedCohorts, on = c("pixelGroup")]
-          plantedCohorts$year <- time(sim)
-          saveRDS(plantedCohorts, file.path(outputPath(sim), paste0('planted',time(sim), '.rds')))
-          rm(pgLong, pgs)
-
-        }
-        rm(plantedCohorts)
-
-        sim <- scheduleEvent(sim, time(sim) + 10, 'assistedMigrationBC', 'trackPlantedCohorts', eventPriority = 5.5)
-      }
-    },
-
     landscapeSummary = {
-      # landscapeSnapshot <- landscapeCalc(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap, time = time(sim))
-      # if (!is.null(sim$summarySubCohortData)){
-      #   sim$summarySubCohortData <- rbind(sim$summarySubCohortData, landscapeSnapshot)
-      # } else {
-      #   sim$summarySubCohortData <- landscapeSnapshot
-      # }
-      sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'landscapeSummary', eventPriority = 8)
-
+      plantedCohorts <- sim$cohortData[planted == TRUE,]
+      if (!is.null(sim$plantedCohorts)){
+        sim$plantedCohorts <- rbind(sim$plantedCohorts, plantedCohorts, fill = TRUE)
+      } else {
+        sim$plantedCohorts <- plantedCohorts
+      }
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$landscapeSummaryTime, 'assistedMigrationBC', 'landscapeSummary', eventPriority = 8)
     },
 
     warning(paste("Undefined event type: \'", current(sim)[1, "eventType", with = FALSE],
@@ -229,7 +195,8 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim))
   BECkey <- copy(BECkey)
   ecoregionKey <- as.data.table(ecoregionMap@data@attributes[[1]])
   setnames(ecoregionKey, 'ID', 'ecoregionMapCode') #Change ID, because ID in BECkey = ecoregion, not mapcode
-  BECkey[, ID := as.factor(paddedFloatToChar(ID, padL = 2))]
+  pLength <- max(nchar(as.character(ecoregionKey$ecoregion)))
+  BECkey[, ID := as.factor(paddedFloatToChar(ID, padL = pLength))]
 
   ecoregionKey <- BECkey[ecoregionKey, on = c("ID" = 'ecoregion')] #now we have zsv of cohortData$ecoregionGroup
   ecoregionKeySmall <- ecoregionKey[, .(zsv, ecoregionGroup)]
