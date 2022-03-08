@@ -38,7 +38,7 @@ defineModule(sim, list(
                     desc = "how often to save object with every planted cohort"),
     defineParameter("optimizeProvenanceTable", 'logical', TRUE, NA, NA, 'if FALSE, will only plant what is present'),
     defineParameter("trackPlanting", 'logical', FALSE, NA, NA,
-                    desc = 'if true, adds column to cohortData for tracking harvest')
+                    desc = 'if true, adds "Planted" column to cohortData for tracking harvest')
   ),
   inputObjects = bind_rows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
@@ -102,11 +102,8 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
         sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
                                            ecoregionMap = sim$ecoregionMap,
                                            BECkey = sim$BECkey, time = time(sim))
-
-        if (P(sim)$trackPlanting) {
-          sim$cohortData[is.na(planted), planted := FALSE]
-        }
       }
+
       sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
       #this is post-dispersal, but before growth and mortality
     },
@@ -179,11 +176,12 @@ Init <- function(sim) {
     #this could obviously be combined into one function call - todo later.
   }
 
- if (P(sim)$trackPlanting) {
-   #assume nothing is planted at start(sim)
-   sim$cohortData[, planted := FALSE]
- }
-
+  #assign provenance as it is part of cohortDefinitionCols
+  if (is.null(sim$cohortData$Provenance) | any(is.na(sim$cohortData$Provenance))) {
+    sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
+                                       ecoregionMap = sim$ecoregionMap,
+                                       BECkey = sim$BECkey, time = time(sim))
+  }
 
   return(invisible(sim))
 }
