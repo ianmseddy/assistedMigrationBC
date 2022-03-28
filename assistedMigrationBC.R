@@ -206,7 +206,7 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim))
   } else {
     cohortData <- cohortData[ecoregionKeySmall, on = c("ecoregionGroup" = 'ecoregionGroup')]
     setnames(cohortData, 'zsv', 'assumedProvenance')
-    cohortData[is.na(Provenance), Provenance := assumedProvenance]
+    suppressWarnings(cohortData[is.na(Provenance), Provenance := assumedProvenance])
     cohortData[, assumedProvenance := NULL]
     setcolorder(cohortData, cohortCols)
   }
