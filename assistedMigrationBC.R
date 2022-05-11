@@ -30,15 +30,18 @@ defineModule(sim, list(
                     paste("Should this entire module be run with caching activated?",
                           "This is generally intended for data-type modules, where stochasticity",
                           "and time are not relevant")),
-    defineParameter("sppEquivCol", "character", "Boreal", NA, NA,
-                    "The column in sim$specieEquivalency data.table to use as a naming convention"),
+    defineParameter("cohortDefinitionCols", "character", c("pixelGroup", "speciesCode", "age", "Provenance", "Planted"),
+                    NA, NA, desc = paste("`cohortData` columns that determine what constitutes a cohort.",
+                                         "This module only uses the param for assertions")),
     defineParameter("doAssistedMigration", 'logical', TRUE, NA, NA,
                     "if TRUE, provenance table is updated at 2020, 2050, and 2080"),
     defineParameter("landscapeSummaryTime", "numeric", 10, NA, NA,
                     desc = "how often to save object with every planted cohort"),
     defineParameter("optimizeProvenanceTable", 'logical', TRUE, NA, NA, 'if FALSE, will only plant what is present'),
-    defineParameter("trackPlanting", 'logical', FALSE, NA, NA,
-                    desc = 'if true, adds "Planted" column to cohortData for tracking harvest')
+    defineParameter("sppEquivCol", "character", "Boreal", NA, NA,
+                    "The column in sim$specieEquivalency data.table to use as a naming convention"),
+    defineParameter("trackGeneticModifier", "logical", TRUE, NA, NA,
+                    "if TRUE, will remove the genetic modifier column if present, every year, as clean up of cohortData")
   ),
   inputObjects = bind_rows(
     #expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
@@ -97,12 +100,22 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
     },
 
     assignProvenance = {
+      if (P(sim)$trackGeneticModifier) {
+        if (!is.null(sim$cohortData$HTp_pred)){
+          sim$cohortData[, HTp_pred := NULL]
+        }
+      }
 
       if (is.null(sim$cohortData$Provenance) | any(is.na(sim$cohortData$Provenance))) {
+        oldNrow <- nrow(sim$cohortData)
         sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
                                            ecoregionMap = sim$ecoregionMap,
                                            BECkey = sim$BECkey, time = time(sim))
+        if (nrow(sim$cohortData) != oldNrow) { stop("error with joining of Provenance table")}
       }
+
+      assertCohortData(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap,
+                       cohortDefinitionCols = P(sim)$cohortDefinitionCols)
 
       sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
       #this is post-dispersal, but before growth and mortality
@@ -187,7 +200,7 @@ Init <- function(sim) {
 }
 
 assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim)) {
-
+  oldCount <- nrow(cohortData)
   cohortCols <- colnames(cohortData)
   cohortData <- copy(cohortData)
   BECkey <- copy(BECkey)
