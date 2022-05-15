@@ -101,6 +101,7 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
 
     assignProvenance = {
       if (P(sim)$trackGeneticModifier) {
+        #this column must be dropped every year as it is added by LandRCSAM in mortalityAndGrowth event.
         if (!is.null(sim$cohortData$HTp_pred)){
           sim$cohortData[, HTp_pred := NULL]
         }
@@ -110,15 +111,18 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
         oldNrow <- nrow(sim$cohortData)
         sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
                                            ecoregionMap = sim$ecoregionMap,
-                                           BECkey = sim$BECkey, time = time(sim))
-        if (nrow(sim$cohortData) != oldNrow) { stop("error with joining of Provenance table")}
+                                           BECkey = sim$BECkey, time = time(sim),
+                                           cohortDefinitionCols = P(sim)$cohortDefinitionCols)
+        if (nrow(sim$cohortData) != oldNrow) {
+          browser() #use restartSpades to debug
+        }
+
+        assertCohortData(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap,
+                         cohortDefinitionCols = P(sim)$cohortDefinitionCols)
+
+        sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
+        #this is post-dispersal, but before growth and mortality
       }
-
-      assertCohortData(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap,
-                       cohortDefinitionCols = P(sim)$cohortDefinitionCols)
-
-      sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
-      #this is post-dispersal, but before growth and mortality
     },
     updateProvenanceTable = {
       sim$currentBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
@@ -147,9 +151,6 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
   )
   return(invisible(sim))
 }
-
-## event functions
-#   - keep event functions short and clean, modularize by calling subroutines from section below.
 
 ### template initialization
 Init <- function(sim) {
@@ -193,14 +194,14 @@ Init <- function(sim) {
   if (is.null(sim$cohortData$Provenance) | any(is.na(sim$cohortData$Provenance))) {
     sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
                                        ecoregionMap = sim$ecoregionMap,
-                                       BECkey = sim$BECkey, time = time(sim))
+                                       BECkey = sim$BECkey, time = time(sim),
+                                       cohortDefinitionCols = P(sim)$cohortDefinitionCols)
   }
 
   return(invisible(sim))
 }
 
-assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim)) {
-  oldCount <- nrow(cohortData)
+assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim), cohortDefinitionCols) {
   cohortCols <- colnames(cohortData)
   cohortData <- copy(cohortData)
   BECkey <- copy(BECkey)
@@ -224,22 +225,24 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim))
     setcolorder(cohortData, cohortCols)
   }
 
-  anyDuplicates <- duplicated(cohortData[, .(pixelGroup, Provenance, age, speciesCode)])
+  #there should be no duplicates - but the only way to confirm is to parameterize with cohortDefinitionCols
+  anyDuplicates <- duplicated(cohortData[, .SD, .SDcol = cohortDefinitionCols])
   if (any(anyDuplicates)){
-    #This occurs when a formerly NA cohort is assigned a provenance and becomes NA. Should only happen after dispersal.
-    #code lifted from biomass_core. I haven't really figured this one out.
-    tdDuplicates <- cohortData[cohortData[anyDuplicates], nomatch = NULL,
-                               on = c("pixelGroup", "age", 'Provenance', 'speciesCode'), which = TRUE]
-    td <- cohortData[tdDuplicates]
-    td <- td[, .(ecoregionGroup = unique(ecoregionGroup),
-                 B = sum(B, na.rm = TRUE),
-                 mortality = sum(mortality, na.rm = TRUE),
-                 aNPPAct = sum(aNPPAct, na.rm = TRUE)),
-             by = c("pixelGroup", 'speciesCode', 'age', 'Provenance')]
-    cdColNames <- intersect(colnames(cohortData), colnames(td))
-    td <- td[, ..cdColNames] # keep only the columns, in the correct order, as cohortData
-    tdNonDups <- cohortData[-tdDuplicates]
-    cohortData <- rbindlist(list(td, tdNonDups), fill = TRUE)
+    warning("duplicate cohorts detected after assigning Provenance - review")
+    #   #This occurs when a formerly NA cohort is assigned a provenance and becomes NA. Should only happen after dispersal.
+    #   #code lifted from biomass_core. I haven't really figured this one out.
+    #   tdDuplicates <- cohortData[cohortData[anyDuplicates], nomatch = NULL,
+    #                              on = c("pixelGroup", "age", 'Provenance', 'speciesCode'), which = TRUE]
+    #   td <- cohortData[tdDuplicates]
+    #   td <- td[, .(ecoregionGroup = unique(ecoregionGroup),
+    #                B = sum(B, na.rm = TRUE),
+    #                mortality = sum(mortality, na.rm = TRUE),
+    #                aNPPAct = sum(aNPPAct, na.rm = TRUE)),
+    #            by = c("pixelGroup", 'speciesCode', 'age', 'Provenance')]
+    #   cdColNames <- intersect(colnames(cohortData), colnames(td))
+    #   td <- td[, ..cdColNames] # keep only the columns, in the correct order, as cohortData
+    #   tdNonDups <- cohortData[-tdDuplicates]
+    #   cohortData <- rbindlist(list(td, tdNonDups), fill = TRUE)
   }
 
 
