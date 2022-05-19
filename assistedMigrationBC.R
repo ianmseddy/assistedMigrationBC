@@ -108,21 +108,30 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
       }
 
       if (is.null(sim$cohortData$Provenance) | any(is.na(sim$cohortData$Provenance))) {
-        oldNrow <- nrow(sim$cohortData)
+        oldCohortData <- copy(sim$cohortData)
         sim$cohortData <- assignProvenance(cohortData = sim$cohortData,
                                            ecoregionMap = sim$ecoregionMap,
                                            BECkey = sim$BECkey, time = time(sim),
                                            cohortDefinitionCols = P(sim)$cohortDefinitionCols)
-        if (nrow(sim$cohortData) != oldNrow) {
-          browser() #use restartSpades to debug
+        if (nrow(sim$cohortData) != nrow(oldCohortData)) {
+          #this is only temporary until I am sure rows are dropped or introduced
+          warning("before assigning provenance, cohortData had ", oldNrow, " rows - ",
+                  "it now has ", nrow(sim$cohortData), "rows")
+          #this occured once, in 2067 -
+          #incorrect RHJ of CD to Ecoregions, when all EFFSvm ecoregions were replaced by planted cohorts
+          #I believe it is no longer necessayr but will retain it as an alternative to more assertions
+          oldCohortData[, nCohorts := .N, .(pixelGroup)]
+          newCohortData <- copy(sim$cohortData)
+          newCohortData[, nCohorts := .N, .(pixelGroup)]
+          diffCohort <- oldCohortData[!newCohortData, on = c("pixelGroup", "nCohorts")]
+          write.csv(diffCohort, paste0("scratch/", "diffCohort", time(sim), ".csv"))
         }
 
         assertCohortData(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap,
                          cohortDefinitionCols = P(sim)$cohortDefinitionCols)
-
-        sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
         #this is post-dispersal, but before growth and mortality
       }
+      sim <- scheduleEvent(sim, time(sim) + 1, 'assistedMigrationBC', 'assignProvenance', eventPriority = 5.5)
     },
     updateProvenanceTable = {
       sim$currentBEC <- sim$projectedBEC[[grep(pattern = paste0('*', time(sim)), value = TRUE, x = names(sim$projectedBEC))]]
@@ -162,7 +171,7 @@ Init <- function(sim) {
   } else if (time(sim) < 2080) {
     sim$currentBEC <- sim$projectedBEC$BEC2050
   } else {
-    sim$currentBEC <- siM$projectedBEC$BEC2080
+    sim$currentBEC <- sim$projectedBEC$BEC2080
   }
 
   joinCol <- c('BC_Forestry', eval(P(sim)$sppEquivCol))
@@ -218,7 +227,7 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim),
     setnames(cohortData, 'zsv', 'Provenance')
     setcolorder(cohortData, c(cohortCols, 'Provenance'))
   } else {
-    cohortData <- cohortData[ecoregionKeySmall, on = c("ecoregionGroup" = 'ecoregionGroup')]
+    cohortData <- ecoregionKeySmall[cohortData, on = c("ecoregionGroup" = 'ecoregionGroup')]
     setnames(cohortData, 'zsv', 'assumedProvenance')
     suppressWarnings(cohortData[is.na(Provenance), Provenance := assumedProvenance])
     cohortData[, assumedProvenance := NULL]
@@ -229,22 +238,7 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim),
   anyDuplicates <- duplicated(cohortData[, .SD, .SDcol = cohortDefinitionCols])
   if (any(anyDuplicates)){
     warning("duplicate cohorts detected after assigning Provenance - review")
-    #   #This occurs when a formerly NA cohort is assigned a provenance and becomes NA. Should only happen after dispersal.
-    #   #code lifted from biomass_core. I haven't really figured this one out.
-    #   tdDuplicates <- cohortData[cohortData[anyDuplicates], nomatch = NULL,
-    #                              on = c("pixelGroup", "age", 'Provenance', 'speciesCode'), which = TRUE]
-    #   td <- cohortData[tdDuplicates]
-    #   td <- td[, .(ecoregionGroup = unique(ecoregionGroup),
-    #                B = sum(B, na.rm = TRUE),
-    #                mortality = sum(mortality, na.rm = TRUE),
-    #                aNPPAct = sum(aNPPAct, na.rm = TRUE)),
-    #            by = c("pixelGroup", 'speciesCode', 'age', 'Provenance')]
-    #   cdColNames <- intersect(colnames(cohortData), colnames(td))
-    #   td <- td[, ..cdColNames] # keep only the columns, in the correct order, as cohortData
-    #   tdNonDups <- cohortData[-tdDuplicates]
-    #   cohortData <- rbindlist(list(td, tdNonDups), fill = TRUE)
   }
-
 
   return(cohortData)
 }
