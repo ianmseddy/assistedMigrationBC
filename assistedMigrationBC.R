@@ -15,7 +15,7 @@ defineModule(sim, list(
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = deparse(list("README.txt", "assistedMigrationBC.Rmd")),
-  reqdPkgs = list('data.table', 'magrittr', 'raster'),
+  reqdPkgs = list('data.table', 'magrittr', 'raster', "ianmseddy/LandRCSAM (>= 0.0.2.0004)"),
   parameters = rbind(
     #defineParameter("paramName", "paramClass", value, min, max, "parameter description"),
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA,
@@ -114,19 +114,12 @@ doEvent.assistedMigrationBC = function(sim, eventTime, eventType) {
                                            BECkey = sim$BECkey, time = time(sim),
                                            cohortDefinitionCols = P(sim)$cohortDefinitionCols)
         if (nrow(sim$cohortData) != nrow(oldCohortData)) {
-          #this is only temporary until I am sure rows are dropped or introduced
-          warning("before assigning provenance, cohortData had ", oldNrow, " rows - ",
-                  "it now has ", nrow(sim$cohortData), "rows")
-          #this occured once, in 2067 -
-          #incorrect RHJ of CD to Ecoregions, when all EFFSvm ecoregions were replaced by planted cohorts
-          #I believe it is no longer necessayr but will retain it as an alternative to more assertions
-          oldCohortData[, nCohorts := .N, .(pixelGroup)]
-          newCohortData <- copy(sim$cohortData)
-          newCohortData[, nCohorts := .N, .(pixelGroup)]
-          diffCohort <- oldCohortData[!newCohortData, on = c("pixelGroup", "nCohorts")]
-          write.csv(diffCohort, paste0("scratch/", "diffCohort", time(sim), ".csv"))
+          #I believe this was occurring from an incorrect join - leading to NA everything except ecoregionGrouop
+          #it should be fixed
+          stop("error with assigning Provenance")
         }
 
+        rm(oldCohortData)
         assertCohortData(cohortData = sim$cohortData, pixelGroupMap = sim$pixelGroupMap,
                          cohortDefinitionCols = P(sim)$cohortDefinitionCols)
         #this is post-dispersal, but before growth and mortality
@@ -232,12 +225,6 @@ assignProvenance <- function(cohortData, ecoregionMap, BECkey, time = time(sim),
     suppressWarnings(cohortData[is.na(Provenance), Provenance := assumedProvenance])
     cohortData[, assumedProvenance := NULL]
     setcolorder(cohortData, cohortCols)
-  }
-
-  #there should be no duplicates - but the only way to confirm is to parameterize with cohortDefinitionCols
-  anyDuplicates <- duplicated(cohortData[, .SD, .SDcol = cohortDefinitionCols])
-  if (any(anyDuplicates)){
-    warning("duplicate cohorts detected after assigning Provenance - review")
   }
 
   return(cohortData)
